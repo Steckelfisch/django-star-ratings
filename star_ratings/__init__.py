@@ -16,3 +16,11 @@ def get_star_ratings_rating_model_name():
 
 def get_star_ratings_rating_model():
     return swapper.load_model('star_ratings', 'Rating')
+
+
+def get_star_ratings_userrating_model_name():
+    return swapper.get_model_name('star_ratings', 'UserRating')
+
+
+def get_star_ratings_userrating_model():
+    return swapper.load_model('star_ratings', 'UserRating')

@@ -1,19 +1,22 @@
 from __future__ import unicode_literals
-
+import swapper
 from decimal import Decimal
 import uuid
 from django import template
 from django.template import loader
 
-from ..models import UserRating
-from .. import app_settings, get_star_ratings_rating_model
+# from ..models import UserRating
+from .. import app_settings, get_star_ratings_rating_model, get_star_ratings_userrating_model
 from ..compat import is_authenticated
+
+UserRating = get_star_ratings_userrating_model()
 
 register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def ratings(context, item, icon_height=app_settings.STAR_RATINGS_STAR_HEIGHT, icon_width=app_settings.STAR_RATINGS_STAR_WIDTH, read_only=False, template_name=None):
+def ratings(context, item, icon_height=app_settings.STAR_RATINGS_STAR_HEIGHT,
+            icon_width=app_settings.STAR_RATINGS_STAR_WIDTH, read_only=False, template_name=None):
     request = context.get('request')
 
     if request is None:

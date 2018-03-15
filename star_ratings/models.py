@@ -15,6 +15,8 @@ from model_utils.models import TimeStampedModel
 
 from . import app_settings, get_star_ratings_rating_model_name, get_star_ratings_rating_model
 
+import logging
+logger = logging.getLogger(__name__)
 
 def _clean_user(user):
     if not app_settings.STAR_RATINGS_ANONYMOUS:
@@ -42,8 +44,12 @@ class RatingManager(models.Manager):
         ct = ContentType.objects.get_for_model(instance)
 
         user = _clean_user(user)
-        existing_rating = UserRating.objects.for_instance_by_user(instance, user)
-
+        # existing_rating = UserRating.objects.for_instance_by_user(instance, user)
+        user_rating_model = swapper.load_model('star_ratings', 'UserRating')
+        existing_rating = user_rating_model.objects.for_instance_by_user(instance, user)
+        logger.debug("user {0}  instance {1} rating {2}".format(str(user),
+                                                                str(instance),
+                                                                str(existing_rating)))
         if existing_rating:
             if not app_settings.STAR_RATINGS_RERATE:
                 raise ValidationError(_('Already rated.'))
@@ -52,7 +58,8 @@ class RatingManager(models.Manager):
             return existing_rating.rating
         else:
             rating, created = self.get_or_create(content_type=ct, object_id=instance.pk)
-            return UserRating.objects.create(user=user, score=score, rating=rating, ip=ip).rating
+            logger.debug("Rating for object created: {0}".format(str(created)))
+            return user_rating_model.objects.create(user=user, score=score, rating=rating, ip=ip).rating
 
 
 @python_2_unicode_compatible
@@ -93,7 +100,11 @@ class AbstractBaseRating(models.Model):
         """
         Recalculate the totals, and save.
         """
-        aggregates = self.user_ratings.aggregate(total=Sum('score'), average=Avg('score'), count=Count('score'))
+        #  attr_name = '%(app_label)s_%(class)s_related'
+        attr_name = swapper.get_model_name('star_ratings', 'UserRating').lower().replace('.','_')
+        user_ratings = getattr(self, attr_name+"_related")
+        aggregates = user_ratings.aggregate(total=Sum('score'), average=Avg('score'), count=Count('score'))
+        # aggregates = self.user_ratings.aggregate(total=Sum('score'), average=Avg('score'), count=Count('score'))
         self.count = aggregates.get('count') or 0
         self.total = aggregates.get('total') or 0
         self.average = aggregates.get('average') or 0.0
@@ -129,21 +140,28 @@ class UserRatingManager(models.Manager):
 
 
 @python_2_unicode_compatible
-class UserRating(TimeStampedModel):
+class AbstractBaseUserRating(TimeStampedModel):
     """
     An individual rating of a user against a model.
     """
     user = models.ForeignKey(settings.AUTH_USER_MODEL, blank=True, null=True, on_delete=models.CASCADE)
     ip = models.GenericIPAddressField(blank=True, null=True)
     score = models.PositiveSmallIntegerField()
-    rating = models.ForeignKey(get_star_ratings_rating_model_name(), related_name='user_ratings', on_delete=models.CASCADE)
+    # rating = models.ForeignKey(get_star_ratings_rating_model_name(), related_name='user_ratings', on_delete=models.CASCADE)
+    rating = models.ForeignKey(get_star_ratings_rating_model_name(), related_name='%(app_label)s_%(class)s_related', on_delete=models.CASCADE)
 
     objects = UserRatingManager()
 
     class Meta:
         unique_together = ['user', 'rating']
+        abstract = True
 
     def __str__(self):
         if not app_settings.STAR_RATINGS_ANONYMOUS:
             return '{} rating {} for {}'.format(self.user, self.score, self.rating.content_object)
         return '{} rating {} for {}'.format(self.ip, self.score, self.rating.content_object)
+
+
+class UserRating(AbstractBaseUserRating):
+    class Meta(AbstractBaseUserRating.Meta):
+        swappable = swapper.swappable_setting('star_ratings', 'UserRating')

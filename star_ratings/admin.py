@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 from django.contrib import admin
 from django.utils.translation import ugettext_lazy as _
 
-from . import app_settings, get_star_ratings_rating_model
-from .models import UserRating
+from . import app_settings, get_star_ratings_rating_model, get_star_ratings_userrating_model
+# from .models import UserRating
 
 
 class UserRatingAdmin(admin.ModelAdmin):
@@ -40,4 +40,4 @@ class RatingAdmin(admin.ModelAdmin):
 
 
 admin.site.register(get_star_ratings_rating_model(), RatingAdmin)
-admin.site.register(UserRating, UserRatingAdmin)
+admin.site.register(get_star_ratings_userrating_model(), UserRatingAdmin)
